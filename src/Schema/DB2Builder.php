@@ -12,23 +12,20 @@ class DB2Builder extends Builder
      * Determine if the given table exists.
      */
     public function hasTable($table): bool
-    {
-        $sql = $this->grammar->compileTableExists();
-        $schemaTable = explode('.', $table);
+{
+    $schema = $this->connection->getDefaultSchema();
+    $schemaTable = explode('.', $table);
 
-        if (count($schemaTable) > 1) {
-            $schema = $schemaTable[0];
-            $table = $this->connection->getTablePrefix().$schemaTable[1];
-        } else {
-            $schema = $this->connection->getDefaultSchema();
-            $table = $this->connection->getTablePrefix().$table;
-        }
-
-        return count($this->connection->select($sql, [
-            $schema,
-            $table,
-        ])) > 0;
+    if (count($schemaTable) > 1) {
+        $schema = $schemaTable[0];
+        $table = $this->connection->getTablePrefix() . $schemaTable[1];
     }
+
+    $sql = $this->grammar->compileTableExists($schema, $table);
+    $bindings = [$schema, $table];
+
+    return count($this->connection->select($sql, $bindings)) > 0;
+}
 
     /**
      * Get the column listing for a given table.
@@ -83,6 +80,6 @@ class DB2Builder extends Builder
             return call_user_func($this->resolver, $table, $callback);
         }
 
-        return new DB2Blueprint($table, $callback);
+        return new DB2Blueprint($this->connection, $table, $callback);
     }
 }

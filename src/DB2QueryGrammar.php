@@ -7,6 +7,8 @@ use Illuminate\Database\Query\Grammars\Grammar;
 
 class DB2QueryGrammar extends Grammar
 {
+
+protected $tablePrefix = '';
     /**
      * The format for database stored dates.
      *

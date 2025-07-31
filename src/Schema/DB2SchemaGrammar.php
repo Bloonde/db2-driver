@@ -26,6 +26,20 @@ class DB2SchemaGrammar extends Grammar
         'Before',
         'ImplicitlyHidden',
     ];
+    
+    /**
+     * El prefijo de las tablas para la base de datos.
+     *
+     * @var string
+     */
+    public $tablePrefix = '';
+    
+    protected $connection;
+
+public function __construct($connection = null)
+{
+    $this->connection = $connection;
+}
 
     /**
      * The possible column serials
@@ -58,7 +72,7 @@ class DB2SchemaGrammar extends Grammar
      *
      * @return string
      */
-    public function compileTableExists()
+    public function compileTableExists($schema, $table)
     {
         return 'select * from information_schema.tables where table_schema = upper(?) and table_name = upper(?)';
     }
@@ -81,7 +95,8 @@ class DB2SchemaGrammar extends Grammar
      * @param  \Illuminate\Database\Connection  $connection
      * @return string
      */
-    public function compileCreate(Blueprint $blueprint, Fluent $command, Connection $connection)
+    public function compileCreate(Blueprint $blueprint, Fluent $command)
+
     {
         $columns = implode(', ', $this->getColumns($blueprint));
         $sql = 'create table '.$this->wrapTable($blueprint);
@@ -575,10 +590,12 @@ class DB2SchemaGrammar extends Grammar
      * @param  \Illuminate\Support\Fluent  $column
      * @return string
      */
-    protected function typeEnum(Fluent $column)
-    {
-        return "enum('".implode("', '", $column->allowed)."')";
-    }
+    protected function typeEnum(\Illuminate\Support\Fluent $column)
+{
+    // En DB2 no existe ENUM, así que usamos VARCHAR y opcionalmente una CHECK constraint
+    // Devuelve simplemente varchar de un tamaño suficiente
+    return "varchar(255)";
+}
 
     /**
      * Create the column definition for a date type.
@@ -819,8 +836,16 @@ class DB2SchemaGrammar extends Grammar
      * @param  \Illuminate\Database\Connection  $connection
      * @return string
      */
-    public function compileAddReplyListEntry(Blueprint $blueprint, Fluent $command, Connection $connection)
+    public function compileAddReplyListEntry(Blueprint $blueprint, Fluent $command)
     {
+    
+        // Obtener la conexión a partir del blueprint (suponiendo que tiene el método getConnection)
+        $connection = $this->connection;
+        if (!$connection) {
+            throw new \RuntimeException('DB2SchemaGrammar connection not set.');
+        }
+        
+        
         $sequenceNumberQuery = <<<'EOT'
             with reply_list_info(sequence_number) as (
                 values(1)
@@ -872,4 +897,32 @@ EOT;
 
         return $this->compileExecuteCommand($blueprint, $command);
     }
+    
+    /**
+ * Create the column definition for a tiny integer type.
+ *
+ * @param  \Illuminate\Support\Fluent  $column
+ * @return string
+ */
+protected function typeTinyInteger(\Illuminate\Support\Fluent $column)
+{
+    // IBM DB2 no soporta TINYINT, usar SMALLINT
+    return 'smallint';
+}
+public function compileInsertOrIgnore(\Illuminate\Database\Query\Builder $query, array $values)
+{
+    $columns = $this->columnize(array_keys(reset($values)));
+    $parameters = $this->parameterize(reset($values));
+
+    $table = $this->wrapTable($query->from);
+
+    // DB2/i soporta INSERT con MERGE usando NOT EXISTS
+    return "INSERT INTO {$table} ({$columns})
+            SELECT {$parameters} FROM SYSIBM.SYSDUMMY1
+            WHERE NOT EXISTS (
+                SELECT 1 FROM {$table}
+                WHERE {$this->compileWheres($query)}
+            )";
+}
+
 }

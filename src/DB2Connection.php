@@ -77,28 +77,28 @@ class DB2Connection extends Connection
      * @return \Illuminate\Database\Grammar
      */
     protected function getDefaultQueryGrammar()
-    {
-        $defaultGrammar = new DB2QueryGrammar;
+{
+    $defaultGrammar = new DB2QueryGrammar($this);
 
-        // If a date format was specified in constructor
-        if (array_key_exists('date_format', $this->config)) {
-            $defaultGrammar->setDateFormat($this->config['date_format']);
-        }
-
-        // If offset compatability mode was specified in constructor
-        if (array_key_exists('offset_compatibility_mode', $this->config)) {
-            $defaultGrammar->setOffsetCompatibilityMode($this->config['offset_compatibility_mode']);
-        }
-
-        return $this->withTablePrefix($defaultGrammar);
+    if (array_key_exists('date_format', $this->config)) {
+        $defaultGrammar->setDateFormat($this->config['date_format']);
     }
+
+    if (array_key_exists('offset_compatibility_mode', $this->config)) {
+        $defaultGrammar->setOffsetCompatibilityMode($this->config['offset_compatibility_mode']);
+    }
+
+    $defaultGrammar->setTablePrefix($this->tablePrefix);
+
+    return $defaultGrammar;
+}
 
     /**
      * Get the efault grammar for specified Schema
      */
     protected function getDefaultSchemaGrammar(): \Illuminate\Database\Grammar
     {
-        return new DB2SchemaGrammar;
+        return new DB2SchemaGrammar($this); 
     }
 
     /**
