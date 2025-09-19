@@ -24,6 +24,54 @@ protected $tablePrefix = '';
     protected $offsetCompatibilityMode = true;
 
     /**
+     * Optimización segura: convertir IN/NOT IN de un único valor en comparación directa.
+     * No accede a clave 'not' (Laravel separa whereIn y whereNotIn) evitando errores de índice.
+     */
+    protected function whereIn(Builder $query, $where)
+    {
+        $values = $where['values'];
+
+        if ($values instanceof Builder || $values instanceof \Closure) {
+            return parent::whereIn($query, $where);
+        }
+
+        if (is_array($values) && count($values) === 0) {
+            // Consistente con semántica: IN () imposible -> falso
+            return '0 = 1';
+        }
+
+        if (is_array($values) && count($values) === 1 && !($values[0] instanceof Expression)) {
+            $column = $this->wrap($where['column']);
+            $parameter = $this->parameter($values[0]);
+            return $column.' = '.$parameter;
+        }
+
+        return parent::whereIn($query, $where);
+    }
+
+    protected function whereNotIn(Builder $query, $where)
+    {
+        $values = $where['values'];
+
+        if ($values instanceof Builder || $values instanceof \Closure) {
+            return parent::whereNotIn($query, $where);
+        }
+
+        if (is_array($values) && count($values) === 0) {
+            // NOT IN () es tautología
+            return '1 = 1';
+        }
+
+        if (is_array($values) && count($values) === 1 && !($values[0] instanceof Expression)) {
+            $column = $this->wrap($where['column']);
+            $parameter = $this->parameter($values[0]);
+            return $column.' <> '.$parameter;
+        }
+
+        return parent::whereNotIn($query, $where);
+    }
+
+    /**
      * Wrap a single string in keyword identifiers.
      *
      * @param  string  $value
