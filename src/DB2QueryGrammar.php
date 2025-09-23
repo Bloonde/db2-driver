@@ -23,7 +23,7 @@ protected $tablePrefix = '';
      */
     protected $offsetCompatibilityMode = true;
 
-        /**
+         /**
      * Forzar case-insensitive para LIKE / NOT LIKE envolviendo columna y valor en UPPER().
      * Respeta expresiones crudas (Expression) para no duplicar UPPER().
      *
@@ -31,14 +31,14 @@ protected $tablePrefix = '';
      * @param array   $where
      * @return string
      */
-    protected function whereBasic(Builder $query, $where)
+        protected function whereBasic(Builder $query, $where)
     {
         $operator = strtoupper($where['operator']);
 
         if (in_array($operator, ['LIKE', 'NOT LIKE'])) {
             $column = $where['column'] instanceof Expression
                 ? $this->getValue($where['column'])
-                : 'UPPER('.$this->wrap($where['column']).')';
+                : $this->upperSafeColumn($where['column']);
 
             $value = $where['value'] instanceof Expression
                 ? $this->getValue($where['value'])
@@ -47,8 +47,34 @@ protected $tablePrefix = '';
             return $column.' '.$operator.' '.$value;
         }
 
-        // Comportamiento original para el resto de operadores
         return $this->wrap($where['column']).' '.$where['operator'].' '.$this->parameter($where['value']);
+    }
+
+    /**
+     * Aplica UPPER directo salvo columnas que requieren CAST (fechas/horas).
+     * Evita CHAR() sobre JSON/CLOB grandes que dispara SQL0137.
+     *
+     * @param string $column
+     * @return string
+     */
+    protected function upperSafeColumn($column)
+    {
+        if ($this->needsCharCast($column)) {
+            return 'UPPER(CHAR('.$this->wrap($column).'))';
+        }
+        return 'UPPER('.$this->wrap($column).')';
+    }
+
+    /**
+     * Heurística simple para decidir cuándo castear (fechas/horas).
+     * Personalizable ampliando el patrón.
+     *
+     * @param string $column
+     * @return bool
+     */
+    protected function needsCharCast($column)
+    {
+        return (bool) preg_match('/(_at|_date|_time)$/i', $column);
     }
 
     /**
