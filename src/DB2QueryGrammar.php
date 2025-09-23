@@ -23,6 +23,34 @@ protected $tablePrefix = '';
      */
     protected $offsetCompatibilityMode = true;
 
+        /**
+     * Forzar case-insensitive para LIKE / NOT LIKE envolviendo columna y valor en UPPER().
+     * Respeta expresiones crudas (Expression) para no duplicar UPPER().
+     *
+     * @param Builder $query
+     * @param array   $where
+     * @return string
+     */
+    protected function whereBasic(Builder $query, $where)
+    {
+        $operator = strtoupper($where['operator']);
+
+        if (in_array($operator, ['LIKE', 'NOT LIKE'])) {
+            $column = $where['column'] instanceof Expression
+                ? $this->getValue($where['column'])
+                : 'UPPER('.$this->wrap($where['column']).')';
+
+            $value = $where['value'] instanceof Expression
+                ? $this->getValue($where['value'])
+                : 'UPPER('.$this->parameter($where['value']).')';
+
+            return $column.' '.$operator.' '.$value;
+        }
+
+        // Comportamiento original para el resto de operadores
+        return $this->wrap($where['column']).' '.$where['operator'].' '.$this->parameter($where['value']);
+    }
+
     /**
      * Optimización segura: convertir IN/NOT IN de un único valor en comparación directa.
      * No accede a clave 'not' (Laravel separa whereIn y whereNotIn) evitando errores de índice.
