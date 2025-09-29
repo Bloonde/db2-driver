@@ -89,15 +89,19 @@ protected $tablePrefix = '';
             return parent::whereIn($query, $where);
         }
 
-        if (is_array($values) && count($values) === 0) {
-            // Consistente con semántica: IN () imposible -> falso
-            return '0 = 1';
-        }
+        if (is_array($values)) {
+            if (count($values) === 0) {
+                return '0 = 1';
+            }
 
-        if (is_array($values) && count($values) === 1 && !($values[0] instanceof Expression)) {
-            $column = $this->wrap($where['column']);
-            $parameter = $this->parameter($values[0]);
-            return $column.' = '.$parameter;
+            if (count($values) === 1) {
+                $only = reset($values);
+                if (!($only instanceof Expression)) {
+                    $column = $this->wrap($where['column']);
+                    $parameter = $this->parameter($only);
+                    return $column.' = '.$parameter;
+                }
+            }
         }
 
         return parent::whereIn($query, $where);
